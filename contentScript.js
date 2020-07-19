@@ -6,15 +6,20 @@
 function createToolbar() {
     const html = `
     <div id="toolbar_container">
-    <ul id="toolbar_navigation">        
-        <li id="toolbar_title" class="toolbar_item" href="#">june</li>
-        <li id="toolbar_description" class="toolbar_item" href="#"></li>
+    <ul id="toolbar_navigation">
+        <a href="#" id="toolbar_title" class="toolbar_item">june</a>
+        <li id="toolbar_description" class="toolbar_item"></li>
     </ul>
     </div>
     `;
     var height = "35px";
-    $('html').prepend(html);
-    $("toolbar_container").css("height", height);
+    $('html').prepend(
+        $(html).hide().fadeIn("slow")
+    );
+    $("#toolbar_container").css("height", height);
+    $("#toolbar_title").click(() => {
+        run();
+    });
     $('body').css({
         '-webkit-transform': 'translateY(' + height + ')'
     });
@@ -50,54 +55,78 @@ const isFileType = (link) => {
     // return false if there is no attribute in the Link
     if (typeof link.attr === 'undefined') { return false }
     // check if any desired file type is found in the Link's attribute
-    return FILE_TYPES.some(fileType => link.attr.includes(`.${fileType.toLowerCase()}`));
+    return link.attr === "img" || FILE_TYPES.some(fileType => link.attr.includes(`.${fileType.toLowerCase()}`));
 };
 
 
-/**
- * Downloads a URL to a local file.
- * @param {URL} url - The url of the file to be downloaded
- * @param {String} outputFileName - The name of the output file
- */
-const downloadFile = (url, outputFileName) => new Promise((resolve, reject) => {
-    // options for http request
-    const options = {
-        uri: url.toString(),
-        headers: {
-            'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36",
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        gzip: true
-    };
-    // initiate http request
-    request(options)
-        .pipe(fs.createWriteStream(outputFileName))
-        .on('finish', () => {
-            console.log(`  ✅ Successfully downloaded ${url.toString()} to ${outputFileName}` + '\n');
-            resolve();
-        })
-        .on('error', (err) => {
-            console.log(`  ❌ There was an error downloading ${url.toString()} to ${outputFileName}` + '\n');
-            reject(err);
-        });
-});
+// /**
+//  * Downloads a URL to a local file.
+//  * @param {URL} url - The url of the file to be downloaded
+//  * @param {String} outputFileName - The name of the output file
+//  */
+// const downloadFile = (url, outputFileName) => new Promise((resolve, reject) => {
+//     // options for http request
+//     const options = {
+//         uri: url.toString(),
+//         headers: {
+//             'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36",
+//             'Content-Type': 'application/x-www-form-urlencoded'
+//         },
+//         gzip: true
+//     };
+//     // initiate http request
+//     request(options)
+//         .pipe(fs.createWriteStream(outputFileName))
+//         .on('finish', () => {
+//             console.log(`  ✅ Successfully downloaded ${url.toString()} to ${outputFileName}` + '\n');
+//             resolve();
+//         })
+//         .on('error', (err) => {
+//             console.log(`  ❌ There was an error downloading ${url.toString()} to ${outputFileName}` + '\n');
+//             reject(err);
+//         });
+// });
 
 
-/**
- * Process a URL before downloading to a local file.
- * @param {URL} url - The url to be processed
- * @param {Function} cb - The next function
- */
-const processThenDownload = (url, cb) => {
-    // extract name of resource
-    const urlPathName = url.pathname.split("/").pop();
-    // initiate file stream
-    downloadFile(url, urlPathName)
-        .then(() => cb())
-        .catch(err => {
-            cb({ file: url.toString(), error: err });
+// /**
+//  * Process a URL before downloading to a local file.
+//  * @param {URL} url - The url to be processed
+//  * @param {Function} cb - The next function
+//  */
+// const processThenDownload = (url, cb) => {
+//     // extract name of resource
+//     const urlPathName = url.pathname.split("/").pop();
+//     // initiate file stream
+//     downloadFile(url, urlPathName)
+//         .then(() => cb())
+//         .catch(err => {
+//             cb({ file: url.toString(), error: err });
+//         });
+// };
+
+function generateZIP(links) {
+    var zip = new JSZip();
+    var count = 0;
+    var zipFilename = "Files.zip";
+
+    links.forEach(function (url, i) {
+        var filename = links[i];
+        filename = filename.replace(/[\/\*\|\:\<\>\?\"\\]/gi, '')
+        // loading a file and add it in a zip file
+        JSZipUtils.getBinaryContent(url, function (err, data) {
+            if (err) {
+                throw err; // or handle the error
+            }
+            zip.file(filename, data, { binary: true });
+            count++;
+            if (count == links.length) {
+                zip.generateAsync({ type: 'blob' }).then(function (content) {
+                    saveAs(content, zipFilename);
+                });
+            }
         });
-};
+    });
+}
 
 /**
  * Extract and download all desired files from an html webpage
@@ -111,6 +140,7 @@ const processHtml = () => {
             [...document.querySelectorAll(tag)]
                 .map(node => new Link(tag, node[TAG_ATTR_MAP[tag]])));
     }, []);
+    console.log(links);
 
     // extract the unique attribute strings from all Links
     const attributes = [...new Set(
@@ -119,10 +149,9 @@ const processHtml = () => {
             .map(link => link.attr)
     )];
 
-    // download each file in parallel
-    console.log(`>> Downloading ${attributes.length} file(s)...` + '\n');
-
+    $("#toolbar_description").hide();
     $("#toolbar_description")[0].textContent = `>> found ${attributes.length} file(s) matching [${FILE_TYPES.join(", ")}]`;
+    $("#toolbar_description").fadeIn("slow");
 
     const downloadHtml = `
     <a href="#" type="button" id="toolbar_download" class="toolbar_btn toolbar_item">
@@ -132,8 +161,14 @@ const processHtml = () => {
     </a>
     `;
     $("#toolbar_navigation").append(downloadHtml);
-    // for (let i=0; i < attributes.length; i++) {
+    $("#toolbar_download").click(() => {
+        // download each file in parallel
+        console.log(`>> Downloading ${attributes.length} file(s)...` + '\n');
+        generateZIP(attributes);
+    });
+    // for (let i = 0; i < attributes.length; i++) {
     //     // $("#myIdForMyToolbar").append(attributes[i]);
+    //     console.log(attributes[i]);
     // }
     // async.eachOfLimit(attributes, ASYNC_LIMIT, (attr, _idx, cb) => {
     //     try {
@@ -169,67 +204,15 @@ const processHtml = () => {
     //     }
     // });
 };
-$(function () {
+
+function run() {
+    console.log("starting script");
     createToolbar();
-    processHtml();
-});
+    setTimeout(() => {
+        processHtml();
+    }, 3000);
+}
 
-
-
-// function downloadZip() {
-//     let links = [];
-
-//     $('.gallery').on('click', '.thumb', function () {
-
-//         $(this).removeClass().addClass('thumbChecked');
-//         $(this).css("border", "2px solid #c32032");
-//         links.push($(this).attr('src'));
-//         console.log(links);
-
-//         if (links.length != 0) {
-//             $('.download').css("display", "block");
-//         }
-
-//     });
-
-
-//     $('.gallery').on('click', '.thumbChecked', function () {
-
-//         $(this).removeClass().addClass('thumb');
-//         $(this).css("border", "2px solid white");
-//         var itemtoRemove = $(this).attr('src');
-//         links.splice($.inArray(itemtoRemove, links), 1);
-//         console.log(links);
-
-//         if (links.length == 0) {
-//             $('.download').css("display", "none");
-//         }
-
-//     });
-
-
-//     function generateZIP() {
-//         console.log('TEST');
-//         var zip = new JSZip();
-//         var count = 0;
-//         var zipFilename = "Pictures.zip";
-
-//         links.forEach(function (url, i) {
-//             var filename = links[i];
-//             filename = filename.replace(/[\/\*\|\:\<\>\?\"\\]/gi, '').replace("httpsi.imgur.com", "");
-//             // loading a file and add it in a zip file
-//             JSZipUtils.getBinaryContent(url, function (err, data) {
-//                 if (err) {
-//                     throw err; // or handle the error
-//                 }
-//                 zip.file(filename, data, { binary: true });
-//                 count++;
-//                 if (count == links.length) {
-//                     zip.generateAsync({ type: 'blob' }).then(function (content) {
-//                         saveAs(content, zipFilename);
-//                     });
-//                 }
-//             });
-//         });
-//     }
-// }
+run();
+// $(() => {
+// });

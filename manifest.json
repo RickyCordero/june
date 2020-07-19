@@ -18,6 +18,7 @@
             ],
             "css": ["style.css"],
             "js": [
+                "FileSaver.min.js",
                 "jszip.min.js",
                 "jszip-utils.min.js",
                 "jquery-3.5.1.min.js",
