@@ -60,7 +60,6 @@ $(function () {
     }
     function start() {
         loadState(state => {
-            // sendToTab(state);
             updateCheckboxes(state);
         });
     }
@@ -79,8 +78,6 @@ $(function () {
             };
             // set the setting in local storage
             chrome.storage.sync.set(state, () => {
-                const setting = state[LOCAL_KEY];
-                // sendToTab(setting); // send just the changes
                 sendToTab({ message: "refreshState" }); // send just the changes
             });
         })

@@ -34,7 +34,6 @@
         "https://*/"
     ],
     "web_accessible_resources": [
-        "Uni-Sans-Light_0.otf",
         "uni-sans-light-italic-webfont.ttf",
         "uni-sans-semibold-italic-webfont.ttf",
         "toolbar.html",

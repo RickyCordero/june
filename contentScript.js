@@ -8,15 +8,17 @@
         "webp": false
     }
     // Tag and attribute types
-    var TAG_TYPES = ["a", "img", "link"]; // html tags to scrape
-    var TAG_ATTR_MAP = { // attributes to scrape for each tag
+    const TAG_TYPES = ["source", "video", "a", "img", "link"]; // html tags to scrape
+    const TAG_ATTR_MAP = { // attributes to scrape for each tag
+        "source": "src",
+        "video": "src",
         "a": "href",
         "img": "src",
         "link": "href"
     };
 
     // Number of files to download in parallel
-    var ASYNC_LIMIT = 2;
+    const ASYNC_LIMIT = 2;
 
     // A simple class for link processing
     class Link {
@@ -38,7 +40,7 @@
                 </ul>
             </div>
             `;
-        var height = "35px";
+        const height = "35px";
 
         // if toolbar exists, make new one
         if ($("#toolbar_container").length > 0) {
@@ -57,7 +59,7 @@
         $("#toolbar_title").click(() => {
             // hide title slowly
             $("#toolbar_title").hide().fadeOut('slow');
-            run(() => {
+            updateState(() => {
                 // show title slowly
                 $("#toolbar_title").show().fadeIn('slow');
             });
@@ -102,8 +104,8 @@
     };
 
     function generateZIP(attributes) {
-        var zip = new JSZip();
-        var zipFilename = "files.zip";
+        const zip = new JSZip();
+        const zipFilename = "files.zip";
         async.eachOfLimit(attributes, ASYNC_LIMIT, (attr, _idx, cb) => {
             const url = new URL(attr);
             addToZip(url, zip, (err) => {
@@ -144,11 +146,10 @@
     }
 
     /**
-     * Extract and download all desired files from an html webpage
-     * @param {String} html - An html webpage string
+     * Extracts and returns a list of unique attribute links
+     * @param {Object} state - The state object
      */
-    const processHtml = (state) => {
-
+    function getAttributes(state) {
         // map all tree nodes to Links
         const links = TAG_TYPES.reduce((acc, tag) => {
             return acc.concat(
@@ -165,15 +166,28 @@
                     .map(link => link.attr)
             )
         ];
+        return attributes;
+    }
 
+    /**
+     * Extract and download all desired files from an html webpage
+     * @param {String} html - An html webpage string
+     */
+    const processState = (state) => {
+
+        // extract attributes
+        const attributes = getAttributes(state);
+
+        // update toolbar description
         $("#toolbar_description").hide();
         $("#toolbar_description")[0].textContent =
             `>> found ${attributes.length} file(s) matching [${Object.keys(state)
                 .filter(key => state[key]).join(", ")}]`;
-        $("#toolbar_description").fadeIn("slow");
-
-        $("#toolbar_download").hide();
+        $("#toolbar_description").fadeIn("slow", () => {
+        });
+        // update download button
         if ($("#toolbar_download").length > 0) {
+            // $("#toolbar_download").hide().remove();
             $("#toolbar_download").remove();
         }
         if (attributes.length) { // if there are files to download
@@ -184,33 +198,39 @@
                 </span>
             </a>
             `;
-            $("#toolbar_navigation").append(downloadHtml);
+            // $("#toolbar_navigation").append(downloadHtml).fadeIn("slow");
+            $(downloadHtml).hide().appendTo("#toolbar_navigation").fadeIn("slow");
+            // $("#toolbar_download").fadeIn("slow");
             $("#toolbar_download").click(() => {
                 // download each file in parallel
                 console.log(`>> Downloading ${attributes.length} file(s)...` + '\n');
                 generateZIP(attributes);
             });
-            $("#toolbar_download").fadeIn("slow");
         }
+
     };
 
-    function run(callback) {
-        createToolbar();
+    function updateState(callback) {
+        // createToolbar();
         loadState(state => {
-            processHtml(state);
+            processState(state);
             if (callback) {
                 callback();
             }
         });
     }
+    function init() {
+        createToolbar();
+        updateState();
+    }
 
-    run();
+    init();
 
     chrome.runtime.onMessage.addListener(messageListener);
 
     function messageListener(request, _sender, _sendResponse) {
         if (request.message == "refreshState") {
-            run();
+            updateState();
         }
     }
 })();
